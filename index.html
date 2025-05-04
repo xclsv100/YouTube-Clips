@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Clips - Create Shorts from Long Videos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            light: '#f87171',
+                            DEFAULT: '#ef4444',
+                            dark: '#dc2626',
+                        },
+                        dark: {
+                            light: '#1f2937',
+                            DEFAULT: '#111827',
+                            dark: '#030712',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .theme-light {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f9fafb;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+        }
+        .theme-dark {
+            --bg-primary: #111827;
+            --bg-secondary: #030712;
+            --text-primary: #f9fafb;
+            --text-secondary: #9ca3af;
+        }
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+        .bg-primary {
+            background-color: var(--bg-primary);
+        }
+        .bg-secondary {
+            background-color: var(--bg-secondary);
+        }
+        .text-primary {
+            color: var(--text-primary);
+        }
+        .text-secondary {
+            color: var(--text-secondary);
+        }
+        .border-primary {
+            border-color: var(--text-primary);
+        }
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        .video-card {
+            transition: transform 0.3s ease;
+        }
+        .video-card:hover {
+            transform: translateY(-5px);
+        }
+        .rating-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+        }
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .btn-primary {
+            background-color: #ef4444;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #dc2626;
+        }
+        .border-red {
+            border-color: #ef4444;
+        }
+    </style>
+</head>
+<body class="theme-dark">
+    <!-- Navigation -->
+    <nav class="bg-primary border-b border-gray-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex">
+                    <div class="flex-shrink-0 flex items-center">
+                        <i class="fab fa-youtube text-red-600 text-2xl mr-2"></i>
+                        <span class="text-xl font-bold text-white">YouTube Clips</span>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <button id="theme-toggle" class="p-2 rounded-full text-white">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                    <div class="ml-4 flex items-center md:ml-6">
+                        <button id="user-menu" class="max-w-xs bg-primary rounded-full flex items-center text-sm focus:outline-none">
+                            <span class="sr-only">Open user menu</span>
+                            <div class="h-8 w-8 rounded-full bg-gray-800 flex items-center justify-center border border-gray-700">
+                                <i class="fas fa-user text-white"></i>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- User Dropdown (Hidden by default) -->
+    <div id="user-dropdown" class="hidden absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-gray-900 border border-gray-800 z-10">
+        <div class="py-1">
+            <a href="#" class="block px-4 py-2 text-sm text-white hover:bg-gray-800">Your Profile</a>
+            <a href="#" class="block px-4 py-2 text-sm text-white hover:bg-gray-800">Affiliate Dashboard</a>
+            <a href="#" class="block px-4 py-2 text-sm text-white hover:bg-gray-800">Settings</a>
+            <a href="#" class="block px-4 py-2 text-sm text-white hover:bg-gray-800">Sign out</a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <!-- Hero Section -->
+        <div class="px-4 py-12 sm:px-0 text-center">
+            <h1 class="text-4xl font-bold text-white mb-4">Turn Long Videos into Engaging Shorts</h1>
+            <p class="text-xl text-gray-400 mb-8">Paste a YouTube link and we'll automatically create 10+ optimized shorts for you</p>
+            
+            <div class="max-w-2xl mx-auto">
+                <div class="flex">
+                    <input id="youtube-url" type="text" placeholder="Paste YouTube URL here..." class="flex-grow px-4 py-3 rounded-l-lg border border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent bg-gray-900 text-white">
+                    <button id="generate-btn" class="btn-primary hover:bg-red-700 text-white px-6 py-3 rounded-r-lg font-medium transition duration-300">
+                        Generate Shorts
+                    </button>
+                </div>
+                <div id="url-error" class="text-red-400 mt-2 hidden">Please enter a valid YouTube URL</div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading-state" class="hidden flex flex-col items-center justify-center py-12">
+            <div class="loading-spinner border-4 border-red-500 border-t-transparent rounded-full w-12 h-12 mb-4"></div>
+            <p class="text-white">Analyzing video and generating shorts...</p>
+            <p class="text-gray-400">This may take a few minutes</p>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results-section" class="hidden px-4 py-8">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-white">Your Generated Shorts</h2>
+                <div class="flex items-center">
+                    <span class="text-gray-400 mr-2">Sort by:</span>
+                    <select id="sort-select" class="bg-gray-900 border border-gray-700 rounded px-3 py-1 focus:outline-none focus:ring-2 focus:ring-red-500 text-white">
+                        <option value="rating">Rating (Best First)</option>
+                        <option value="duration">Duration</option>
+                        <option value="views">Estimated Views</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="bg-gray-900 rounded-lg p-6 mb-8 border border-gray-800">
+                <h3 class="text-lg font-medium text-white mb-4">Customization Options</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <label class="block text-white mb-2">Add Captions</label>
+                        <div class="flex items-center">
+                            <input type="checkbox" id="captions-toggle" class="mr-2" checked>
+                            <span class="text-gray-400">Enable captions</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-white mb-2">Caption Font</label>
+                        <select id="font-select" class="bg-gray-900 border border-gray-700 rounded px-3 py-1 w-full focus:outline-none focus:ring-2 focus:ring-red-500 text-white">
+                            <option value="sans-serif">Sans-serif (Default)</option>
+                            <option value="serif">Serif</option>
+                            <option value="monospace">Monospace</option>
+                            <option value="cursive">Cursive</option>
+                            <option value="fantasy">Fantasy</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-white mb-2">Background Music</label>
+                        <select id="music-select" class="bg-gray-900 border border-gray-700 rounded px-3 py-1 w-full focus:outline-none focus:ring-2 focus:ring-red-500 text-white">
+                            <option value="none">No Music</option>
+                            <option value="upbeat">Upbeat</option>
+                            <option value="chill">Chill</option>
+                            <option value="epic">Epic</option>
+                            <option value="happy">Happy</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="video-grid" id="video-grid">
+                <!-- Video cards will be inserted here by JavaScript -->
+            </div>
+
+            <div class="mt-8 text-center">
+                <button id="export-all-btn" class="btn-primary hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition duration-300">
+                    Export All Shorts
+                </button>
+                <div id="export-error" class="text-red-400 mt-2 hidden">Please upgrade to a paid plan to export videos</div>
+            </div>
+        </div>
+
+        <!-- Pricing Section -->
+        <div id="pricing-section" class="px-4 py-12">
+            <h2 class="text-3xl font-bold text-center text-white mb-2">Choose Your Plan</h2>
+            <p class="text-center text-gray-400 mb-12">Start with a 7-day free trial. No credit card required.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                <div class="bg-gray-900 rounded-lg p-6 border border-gray-800">
+                    <h3 class="text-xl font-bold text-white mb-4">Starter</h3>
+                    <p class="text-3xl font-bold text-red-500 mb-4">$10<span class="text-lg text-gray-400">/month</span></p>
+                    <ul class="space-y-3 mb-6">
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-red-500 mr-2"></i>
+                            <span class="text-gray-400">50 video exports per month</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-red-500 mr-2"></i>
+                            <span class="text-gray-400">Basic customization</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-red-500 mr-2"></i>
+                            <span class="text-gray-400">720p resolution</span>
+                        </li>
+                    </ul>
+                    <button class="w-full btn-primary hover:bg-red-700 text-white py-2 rounded-lg font-medium transition duration-300">
+                        Start Free Trial
+                    </button>
+                </div>
+                
+                <div class="bg-gray-900 rounded-lg p-6 border-2 border-red-500 relative">
+                    <div class="absolute top-0 right-0 bg-red-500 text-white px-3 py-1 text-xs font-bold rounded-bl-lg rounded-tr-lg">POPULAR</div>
+                    <h3 class="text-xl font-bold text-white mb-4">Pro</h3>
+                    <p class="text-3xl font-bold text-red-500 mb-4">$15<span class="text-lg text-gray-400">/month</span></p>
+                    <ul class="space-y-3 mb-6">
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-red-500 mr-2"></i>
+                            <span class="text-gray-400">150 video exports per month</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-red-500 mr-2"></i>
+                            <span class="text-gray-400">Advanced customization</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-red-500 mr-2"></i>
+                            <span class="text-gray-400">1080p resolution</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-red-500 mr-2"></i>
+                            <span class="text-gray-400">Priority processing</span>
+                        </li>
+                    </ul>
+                    <button class="w-full btn-primary hover:bg-red-700 text-white py-2 rounded-lg font-medium transition duration-300">
+                        Start Free Trial
+                    </button>
+                </div>
+                
+                <div class="bg-gray-900 rounded-lg p-6 border border-gray-800">
+                    <h3 class="text-xl font-bold text-white mb-4">Business</h3>
+                    <p class="text-3xl font-bold text-red-500 mb-4">$20<span class="text-lg text-gray-400">/month</span></p>
+                    <ul class="space-y-3 mb-6">
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-red-500 mr-2"></i>
+                            <span class="text-gray-400">Unlimited video exports</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-red-500 mr-2"></i>
+                            <span class="text-gray-400">All customization options</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-red-500 mr-2"></i>
+                            <span class="text-gray-400">4K resolution</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-red-500 mr-2"></i>
+                            <span class="text-gray-400">Dedicated support</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-red-500 mr-2"></i>
+                            <span class="text-gray-400">Team collaboration</span>
+                        </li>
+                    </ul>
+                    <button class="w-full btn-primary hover:bg-red-700 text-white py-2 rounded-lg font-medium transition duration-300">
+                        Start Free Trial
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Affiliate Program Section -->
+        <div class="px-4 py-12 bg-gray-900">
+            <div class="max-w-4xl mx-auto">
+                <h2 class="text-3xl font-bold text-center text-white mb-2">Earn With Our Affiliate Program</h2>
+                <p class="text-center text-gray-400 mb-8">Get $3 for every customer who signs up through your link</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="bg-gray-800 rounded-lg p-6">
+                        <h3 class="text-xl font-bold text-white mb-4">How It Works</h3>
+                        <ul class="space-y-4">
+                            <li class="flex items-start">
+                                <div class="bg-red-500 rounded-full w-6 h-6 flex items-center justify-center text-white font-bold mr-3 mt-1">1</div>
+                                <span class="text-gray-400">Sign up for our affiliate program</span>
+                            </li>
+                            <li class="flex items-start">
+                                <div class="bg-red-500 rounded-full w-6 h-6 flex items-center justify-center text-white font-bold mr-3 mt-1">2</div>
+                                <span class="text-gray-400">Share your unique referral link</span>
+                            </li>
+                            <li class="flex items-start">
+                                <div class="bg-red-500 rounded-full w-6 h-6 flex items-center justify-center text-white font-bold mr-3 mt-1">3</div>
+                                <span class="text-gray-400">Earn $3 for every paid signup</span>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <div class="bg-gray-800 rounded-lg p-6">
+                        <h3 class="text-xl font-bold text-white mb-4">Your Earnings</h3>
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-gray-400">Total Referrals:</span>
+                            <span class="font-bold text-white">0</span>
+                        </div>
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-gray-400">Total Earnings:</span>
+                            <span class="font-bold text-white">$0</span>
+                        </div>
+                        <div class="flex items-center justify-between mb-6">
+                            <span class="text-gray-400">Available for Payout:</span>
+                            <span class="font-bold text-white">$0</span>
+                        </div>
+                        <button class="w-full btn-primary hover:bg-red-700 text-white py-2 rounded-lg font-medium transition duration-300">
+                            Join Affiliate Program
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 border-t border-gray-800">
+        <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div>
+                    <h3 class="text-lg font-bold text-white mb-4">YouTube Clips</h3>
+                    <p class="text-gray-400">Turn long videos into engaging shorts with our AI-powered platform.</p>
+                </div>
+                <div>
+                    <h4 class="text-md font-bold text-white mb-4">Product</h4>
+                    <ul class="space-y-2">
+                        <li><a href="#" class="text-gray-400 hover:text-white">Features</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white">Pricing</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white">Affiliate Program</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-md font-bold text-white mb-4">Support</h4>
+                    <ul class="space-y-2">
+                        <li><a href="#" class="text-gray-400 hover:text-white">Help Center</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white">Contact Us</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white">FAQ</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-md font-bold text-white mb-4">Legal</h4>
+                    <ul class="space-y-2">
+                        <li><a href="#" class="text-gray-400 hover:text-white">Terms of Service</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white">Privacy Policy</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white">Cookie Policy</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="mt-8 pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center">
+                <p class="text-gray-400">© 2023 YouTube Clips. All rights reserved.</p>
+                <div class="flex space-x-6 mt-4 md:mt-0">
+                    <a href="#" class="text-gray-400 hover:text-white"><i class="fab fa-twitter"></i></a>
+                    <a href="#" class="text-gray-400 hover:text-white"><i class="fab fa-facebook"></i></a>
+                    <a href="#" class="text-gray-400 hover:text-white"><i class="fab fa-instagram"></i></a>
+                    <a href="#" class="text-gray-400 hover:text-white"><i class="fab fa-linkedin"></i></a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Modals -->
+    <!-- Sign Up Modal -->
+    <div id="signup-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-gray-900 rounded-lg p-6 max-w-md w-full border border-gray-800">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-white">Create Your Account</h3>
+                <button id="close-signup" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="signup-form">
+                <div class="mb-4">
+                    <label for="name" class="block text-white mb-2">Full Name</label>
+                    <input type="text" id="name" class="w-full px-3 py-2 border border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-red-500 bg-gray-800 text-white">
+                </div>
+                <div class="mb-4">
+                    <label for="email" class="block text-white mb-2">Email Address</label>
+                    <input type="email" id="email" class="w-full px-3 py-2 border border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-red-500 bg-gray-800 text-white">
+                </div>
+                <div class="mb-4">
+                    <label for="password" class="block text-white mb-2">Password</label>
+                    <input type="password" id="password" class="w-full px-3 py-2 border border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-red-500 bg-gray-800 text-white">
+                </div>
+                <div class="mb-4">
+                    <label for="confirm-password" class="block text-white mb-2">Confirm Password</label>
+                    <input type="password" id="confirm-password" class="w-full px-3 py-2 border border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-red-500 bg-gray-800 text-white">
+                </div>
+                <div class="mb-4">
+                    <input type="checkbox" id="terms" class="mr-2">
+                    <label for="terms" class="text-gray-400">I agree to the <a href="#" class="text-red-500 hover:underline">Terms of Service</a> and <a href="#" class="text-red-500 hover:underline">Privacy Policy</a></label>
+                </div>
+                <button type="submit" class="w-full btn-primary hover:bg-red-700 text-white py-2 rounded-lg font-medium transition duration-300">
+                    Sign Up
+                </button>
+            </form>
+            <div class="mt-4 text-center text-gray-400">
+                Already have an account? <a href="#" class="text-red-500 hover:underline">Log In</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Verification Modal -->
+    <div id="verification-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-gray-900 rounded-lg p-6 max-w-md w-full border border-gray-800">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-white">Verify Your Email</h3>
+                <button id="close-verification" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <p class="text-gray-400 mb-4">We've sent a verification code to your email address. Please enter it below:</p>
+            <form id="verification-form">
+                <div class="mb-4">
+                    <label for="verification-code" class="block text-white mb-2">Verification Code</label>
+                    <input type="text" id="verification-code" class="w-full px-3 py-2 border border-gray-700 rounded focus:outline-none focus:ring-2 focus:ring-red-500 bg-gray-800 text-white">
+                </div>
+                <button type="submit" class="w-full btn-primary hover:bg-red-700 text-white py-2 rounded-lg font-medium transition duration-300">
+                    Verify
+                </button>
+            </form>
+            <div class="mt-4 text-center text-gray-400">
+                Didn't receive a code? <a href="#" class="text-red-500 hover:underline">Resend</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard Modal -->
+    <div id="admin-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-gray-900 rounded-lg p-6 max-w-4xl w-full max-h-screen overflow-y-auto border border-gray-800">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold text-white">Admin Dashboard</h3>
+                <button id="close-admin" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-gray-800 rounded-lg p-4">
+                    <h4 class="text-lg font-bold text-white mb-2">Total Users</h4>
+                    <p class="text-3xl font-bold text-red-500">1,248</p>
+                </div>
+                <div class="bg-gray-800 rounded-lg p-4">
+                    <h4 class="text-lg font-bold text-white mb-2">Active Subscriptions</h4>
+                    <p class="text-3xl font-bold text-red-500">876</p>
+                </div>
+                <div class="bg-gray-800 rounded-lg p-4">
+                    <h4 class="text-lg font-bold text-white mb-2">Total Revenue</h4>
+                    <p class="text-3xl font-bold text-red-500">$12,840</p>
+                </div>
+            </div>
+            
+            <div class="mb-8">
+                <h4 class="text-xl font-bold text-white mb-4">Recent Payments</h4>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-gray-800 rounded-lg overflow-hidden">
+                        <thead class="bg-gray-700">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-white">Date</th>
+                                <th class="px-4 py-2 text-left text-white">User</th>
+                                <th class="px-4 py-2 text-left text-white">Plan</th>
+                                <th class="px-4 py-2 text-left text-white">Amount</th>
+                                <th class="px-4 py-2 text-left text-white">Affiliate</th>
+                                <th class="px-4 py-2 text-left text-white">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-gray-700">
+                                <td class="px-4 py-2 text-gray-400">2023-06-15</td>
+                                <td class="px-4 py-2 text-gray-400">user@example.com</td>
+                                <td class="px-4 py-2 text-gray-400">Pro</td>
+                                <td class="px-4 py-2 text-gray-400">$15.00</td>
+                                <td class="px-4 py-2 text-gray-400">affiliate1</td>
+                                <td class="px-4 py-2 text-gray-400">
+                                    <span class="bg-green-900 text-green-300 text-xs font-medium px-2.5 py-0.5 rounded">Completed</span>
+                                </td>
+                            </tr>
+                            <tr class="border-b border-gray-700">
+                                <td class="px-4 py-2 text-gray-400">2023-06-14</td>
+                                <td class="px-4 py-2 text-gray-400">user2@example.com</td>
+                                <td class="px-4 py-2 text-gray-400">Business</td>
+                                <td class="px-4 py-2 text-gray-400">$20.00</td>
+                                <td class="px-4 py-2 text-gray-400">-</td>
+                                <td class="px-4 py-2 text-gray-400">
+                                    <span class="bg-green-900 text-green-300 text-xs font-medium px-2.5 py-0.5 rounded">Completed</span>
+                                </td>
+                            </tr>
+                            <tr class="border-b border-gray-700">
+                                <td class="px-4 py-2 text-gray-400">2023-06-14</td>
+                                <td class="px-4 py-2 text-gray-400">user3@example.com</td>
+                                <td class="px-4 py-2 text-gray-400">Starter</td>
+                                <td class="px-4 py-2 text-gray-400">$10.00</td>
+                                <td class="px-4 py-2 text-gray-400">affiliate2</td>
+                                <td class="px-4 py-2 text-gray-400">
+                                    <span class="bg-green-900 text-green-300 text-xs font-medium px-2.5 py-0.5 rounded">Completed</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div>
+                <h4 class="text-xl font-bold text-white mb-4">Affiliate Payouts</h4>
+                <div class="flex justify-between items-center mb-4">
+                    <p class="text-gray-400">Total pending payouts: <span class="font-bold text-red-500">$1,256</span></p>
+                    <button class="btn-primary hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition duration-300">
+                        Process All Payouts
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-gray-800 rounded-lg overflow-hidden">
+                        <thead class="bg-gray-700">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-white">Affiliate</th>
+                                <th class="px-4 py-2 text-left text-white">Earnings</th>
+                                <th class="px-4 py-2 text-left text-white">Pending</th>
+                                <th class="px-4 py-2 text-left text-white">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-gray-700">
+                                <td class="px-4 py-2 text-gray-400">affiliate1</td>
+                                <td class="px-4 py-2 text-gray-400">$342</td>
+                                <td class="px-4 py-2 text-gray-400">$126</td>
+                                <td class="px-4 py-2 text-gray-400">
+                                    <button class="text-red-500 hover:underline">Pay Now</button>
+                                </td>
+                            </tr>
+                            <tr class="border-b border-gray-700">
+                                <td class="px-4 py-2 text-gray-400">affiliate2</td>
+                                <td class="px-4 py-2 text-gray-400">$215</td>
+                                <td class="px-4 py-2 text-gray-400">$85</td>
+                                <td class="px-4 py-2 text-gray-400">
+                                    <button class="text-red-500 hover:underline">Pay Now</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Theme Toggle
+        const themeToggle = document.getElementById('theme-toggle');
+        const body = document.body;
+        
+        themeToggle.addEventListener('click', () => {
+            if (body.classList.contains('theme-dark')) {
+                body.classList.remove('theme-dark');
+                body.classList.add('theme-light');
+                themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+            } else {
+                body.classList.remove('theme-light');
+                body.classList.add('theme-dark');
+                themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
+            }
+        });
+
+        // User Menu Toggle
+        const userMenu = document.getElementById('user-menu');
+        const userDropdown = document.getElementById('user-dropdown');
+        
+        userMenu.addEventListener('click', () => {
+            userDropdown.classList.toggle('hidden');
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!userMenu.contains(e.target) && !userDropdown.contains(e.target)) {
+                userDropdown.classList.add('hidden');
+            }
+        });
+
+        // Generate Shorts
+        const generateBtn = document.getElementById('generate-btn');
+        const youtubeUrl = document.getElementById('youtube-url');
+        const urlError = document.getElementById('url-error');
+        const loadingState = document.getElementById('loading-state');
+        const resultsSection = document.getElementById('results-section');
+        const videoGrid = document.getElementById('video-grid');
+        const exportAllBtn = document.getElementById('export-all-btn');
+        const exportError = document.getElementById('export-error');
+        
+        // Sample video data with ratings
+        const sampleVideos = [
+            {
+                id: 1,
+                title: "Most Engaging Moment",
+                duration: "0:15",
+                rating: 5,
+                ratingReason: "High engagement, perfect duration",
+                views: "1.2M",
+                thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+            },
+            {
+                id: 2,
+                title: "Key Insight Highlight",
+                duration: "0:22",
+                rating: 4,
+                ratingReason: "Important content, slightly long",
+                views: "850K",
+                thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+            },
+            {
+                id: 3,
+                title: "Funny Clip",
+                duration: "0:12",
+                rating: 4,
+                ratingReason: "Entertaining but niche appeal",
+                views: "750K",
+                thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+            },
+            {
+                id: 4,
+                title: "Tutorial Segment",
+                duration: "0:18",
+                rating: 3,
+                ratingReason: "Useful but needs context",
+                views: "500K",
+                thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+            },
+            {
+                id: 5,
+                title: "Introduction Part",
+                duration: "0:25",
+                rating: 3,
+                ratingReason: "Too long for a short",
+                views: "400K",
+                thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+            },
+            {
+                id: 6,
+                title: "Behind the Scenes",
+                duration: "0:14",
+                rating: 4,
+                ratingReason: "Good content, slightly blurry",
+                views: "650K",
+                thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+            },
+            {
+                id: 7,
+                title: "Product Demo",
+                duration: "0:20",
+                rating: 3,
+                ratingReason: "Clear but not very engaging",
+                views: "350K",
+                thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+            },
+            {
+                id: 8,
+                title: "Audience Reaction",
+                duration: "0:16",
+                rating: 4,
+                ratingReason: "Emotional impact, good length",
+                views: "720K",
+                thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+            },
+            {
+                id: 9,
+                title: "Expert Tip",
+                duration: "0:19",
+                rating: 3,
+                ratingReason: "Valuable but dry delivery",
+                views: "420K",
+                thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+            },
+            {
+                id: 10,
+                title: "Closing Remarks",
+                duration: "0:28",
+                rating: 2,
+                ratingReason: "Too long, not engaging enough",
+                views: "300K",
+                thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+            }
+        ];
+
+        generateBtn.addEventListener('click', () => {
+            const url = youtubeUrl.value.trim();
+            
+            // Simple URL validation
+            if (!url.includes('youtube.com') && !url.includes('youtu.be')) {
+                urlError.classList.remove('hidden');
+                return;
+            }
+            
+            urlError.classList.add('hidden');
+            loadingState.classList.remove('hidden');
+            
+            // Simulate API call with timeout
+            setTimeout(() => {
+                loadingState.classList.add('hidden');
+                resultsSection.classList.remove('hidden');
+                renderVideos(sampleVideos);
+                
+                // Scroll to results
+                resultsSection.scrollIntoView({ behavior: 'smooth' });
+            }, 3000);
+        });
+
+        // Sort videos
+        const sortSelect = document.getElementById('sort-select');
+        sortSelect.addEventListener('change', () => {
+            const sortBy = sortSelect.value;
+            let sortedVideos = [...sampleVideos];
+            
+            if (sortBy === 'rating') {
+                sortedVideos.sort((a, b) => b.rating - a.rating);
+            } else if (sortBy === 'duration') {
+                sortedVideos.sort((a, b) => {
+                    const aSec = convertToSeconds(a.duration);
+                    const bSec = convertToSeconds(b.duration);
+                    return aSec - bSec;
+                });
+            } else if (sortBy === 'views') {
+                sortedVideos.sort((a, b) => {
+                    const aViews = convertViewsToNumber(a.views);
+                    const bViews = convertViewsToNumber(b.views);
+                    return bViews - aViews;
+                });
+            }
+            
+            renderVideos(sortedVideos);
+        });
+
+        function convertToSeconds(timeStr) {
+            const parts = timeStr.split(':');
+            if (parts.length === 1) return parseInt(parts[0]);
+            return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+        }
+
+        function convertViewsToNumber(viewsStr) {
+            if (viewsStr.includes('M')) return parseFloat(viewsStr) * 1000000;
+            if (viewsStr.includes('K')) return parseFloat(viewsStr) * 1000;
+            return parseFloat(viewsStr);
+        }
+
+        function renderVideos(videos) {
+            videoGrid.innerHTML = '';
+            
+            videos.forEach(video => {
+                const ratingColor = 
+                    video.rating >= 4 ? 'bg-red-500' : 
+                    video.rating >= 3 ? 'bg-yellow-500' : 'bg-red-400';
+                
+                const videoCard = document.createElement('div');
+                videoCard.className = 'video-card bg-gray-900 rounded-lg overflow-hidden relative border border-gray-800';
+                videoCard.innerHTML = `
+                    <div class="relative">
+                        <img src="${video.thumbnail}" alt="${video.title}" class="w-full h-40 object-cover">
+                        <span class="rating-badge ${ratingColor} text-white text-xs font-bold px-2 py-1 rounded-full">
+                            ${video.rating}/5
+                        </span>
+                    </div>
+                    <div class="p-4">
+                        <h3 class="font-bold text-white mb-1">${video.title}</h3>
+                        <div class="flex justify-between text-sm text-gray-400 mb-2">
+                            <span>${video.duration}</span>
+                            <span>${video.views} views</span>
+                        </div>
+                        <p class="text-xs text-gray-400 mb-3">${video.ratingReason}</p>
+                        <button class="w-full btn-primary hover:bg-red-700 text-white py-1 rounded text-sm font-medium transition duration-300 export-btn" data-id="${video.id}">
+                            Export Short
+                        </button>
+                    </div>
+                `;
+                
+                videoGrid.appendChild(videoCard);
+            });
+            
+            // Add export button event listeners
+            document.querySelectorAll('.export-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    if (confirm('You need to upgrade to a paid plan to export videos. Would you like to view our plans?')) {
+                        document.getElementById('pricing-section').scrollIntoView({ behavior: 'smooth' });
+                    }
+                });
+            });
+        }
+
+        // Export all button
+        exportAllBtn.addEventListener('click', () => {
+            exportError.classList.remove('hidden');
+            setTimeout(() => {
+                exportError.classList.add('hidden');
+            }, 3000);
+        });
+
+        // Modals
+        const signupModal = document.getElementById('signup-modal');
+        const closeSignup = document.getElementById('close-signup');
+        const verificationModal = document.getElementById('verification-modal');
+        const closeVerification = document.getElementById('close-verification');
+        const adminModal = document.getElementById('admin-modal');
+        const closeAdmin = document.getElementById('close-admin');
+        
+        // Open signup modal when clicking user icon (simulated)
+        userMenu.addEventListener('click', () => {
+            signupModal.classList.remove('hidden');
+        });
+        
+        closeSignup.addEventListener('click', () => {
+            signupModal.classList.add('hidden');
+        });
+        
+        closeVerification.addEventListener('click', () => {
+            verificationModal.classList.add('hidden');
+        });
+        
+        closeAdmin.addEventListener('click', () => {
+            adminModal.classList.add('hidden');
+        });
+        
+        // Signup form submission
+        const signupForm = document.getElementById('signup-form');
+        signupForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            signupModal.classList.add('hidden');
+            verificationModal.classList.remove('hidden');
+            
+            // In a real app, you would send the verification code to the user's email
+        });
+        
+        // Verification form submission
+        const verificationForm = document.getElementById('verification-form');
+        verificationForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            verificationModal.classList.add('hidden');
+            alert('Your account has been verified! You can now use YouTube Clips.');
+        });
+
+        // Admin access (hidden feature)
+        // Triple click anywhere on the page to access admin dashboard
+        let clickCount = 0;
+        document.addEventListener('click', () => {
+            clickCount++;
+            if (clickCount === 3) {
+                adminModal.classList.remove('hidden');
+                clickCount = 0;
+            }
+            setTimeout(() => {
+                clickCount = 0;
+            }, 1000);
+        });
+    </script>
+<p style="border-radius: 8px; text-align: center; font-size: 12px; color: #fff; margin-top: 16px;position: fixed; left: 8px; bottom: 8px; z-index: 10; background: rgba(0, 0, 0, 0.8); padding: 4px 8px;">Made with <img src="https://enzostvs-deepsite.hf.space/logo.svg" alt="DeepSite Logo" style="width: 16px; height: 16px; vertical-align: middle;display:inline-block;margin-right:3px;filter:brightness(0) invert(1);"><a href="https://enzostvs-deepsite.hf.space" style="color: #fff;text-decoration: underline;" target="_blank" >DeepSite</a> - 🧬 <a href="https://enzostvs-deepsite.hf.space?remix=xclsv/myspace" style="color: #fff;text-decoration: underline;" target="_blank" >Remix</a></p></body>
+</html>
